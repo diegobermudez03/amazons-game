@@ -1,11 +1,12 @@
 import 'package:amazons_game/page/controller.dart';
+import 'package:amazons_game/page/game_states.dart';
 import 'package:flutter/material.dart';
-import 'dart:math';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 
 class GamePage extends StatelessWidget{
+  const GamePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,18 +25,32 @@ class GamePage extends StatelessWidget{
           const Spacer(),
           BlocBuilder<GameController, GameState>(
             builder: (context, state) {
-              return Column(
-                children: [
-                  Text("El juego de las amazonas"),
+              final gameController = BlocProvider.of<GameController>(context);
+              //first dinamically create the stack children, in this case
+              //the board, over that the amazons, and over that optionally the available moves
+              //positions depending on the state
+              final List<Widget> stackChildren = [
+                 Column(
+                    children: getRows(cubeSide),
+                  ),
+                  ...getAmazonsPositions(state, cubeSide, gameController)
+              ];
+              if(state is PossibleAmazonMovesState){
+                stackChildren.addAll( getAvailableMoves(state.available, gameController, cubeSide));
+              }
+              //when we have the stack completed, then we add it to the overall
+              //column display, and dinamically we ask for the player
+              final List<Widget> columnChildren = [
+                 Text("El juego de las amazonas"),
                   Stack(
-                    children: [
-                      Column(
-                        children: getRows(cubeSide),
-                      ),
-                      ...getAmazonsPositions(state, cubeSide)
-                    ],
-                  )
-                ],
+                    children: stackChildren
+                  ),
+              ];
+              if(state is GameInitialState){
+                columnChildren.addAll(getPlayerOptions(gameController));
+              }
+              return Column(
+                children: columnChildren
               );
             },
           ),
@@ -45,26 +60,103 @@ class GamePage extends StatelessWidget{
     );
   }
 
-  List<Positioned> getAmazonsPositions(GameState state, double cubeSide){
-    List<Positioned> amazons = [];
-    for(final amazon in state.amazons){
-      amazons.add(Positioned(
-        top: amazon.y * cubeSide,
-        left: amazon.x * cubeSide,
+  List<Widget> getPlayerOptions(GameController gameController) {
+    return [
+      Text("Quien va a iniciar?"),
+      Row(
+      children: [
+        ElevatedButton(
+          onPressed: ()=>selectPlayer(gameController, 1), 
+          child: Text("Jugador 1"),
+        ),
+        ElevatedButton(
+          onPressed: ()=>selectPlayer(gameController, 2), 
+          child: Text("Jugador 2 (Futuro bot)"),
+        )
+      ],
+    )];
+  }
+
+  void selectPlayer(GameController controller, int player){
+    controller.startPlay(player);
+  }   
+
+
+  List<Positioned> getAvailableMoves(List<Position> available, GameController controller, double cubeSide){
+    List<Positioned> positions = [];
+    for(final pos in available){
+      positions.add(Positioned(
+        //formula is (X * side) + (side/2) to center - (half of the width/height, to have it perfectly centered)
+        top: (pos.y * cubeSide) + (cubeSide / 2) - 15,
+        left: (pos.x * cubeSide) + (cubeSide / 2) - 15,
         child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: Colors.black
+          ),
+        )
+      ));
+    }
+    return positions;
+  }
+
+
+  //IMPORTANT METHOD, FOR PRINTING THE AMAZONS
+  List<AnimatedPositioned> getAmazonsPositions(GameState state, double cubeSide, GameController controller){
+    List<AnimatedPositioned> amazons = [];
+    final bool checkingAvailable = state is PossibleAmazonsPlayState;
+  
+    //iterating over the amazons to print them with animated positions
+    for(int i = 0; i < state.amazons.length; i++){
+      final amazon = state.amazons[i];
+
+      //if we are in the already selected state, then we add the color hardcoded to the container
+      final bool selectedToMove = state is PossibleAmazonMovesState && state.selectedAmazon == i;
+      Container container = Container(
           width: cubeSide,
           height: cubeSide,
           decoration: BoxDecoration(
+            color: selectedToMove ? Colors.red : Colors.transparent,
             image: DecorationImage(
-              image: AssetImage('player${amazon.player}.png')
+              image: AssetImage('player${amazon.player}.png'),
             ),
           ),
-        )
+      );
+      //if we are in the checking available state then we see if the current is available,
+      //if its, then we wrrap the child container in an inkwell, also adding the color
+      Widget child;
+      if(checkingAvailable && state.available.contains(i)){
+        child = Material(
+          color: Colors.red,
+          child: InkWell(
+            splashColor: const Color.fromARGB(255, 78, 4, 4),
+            onTap: ()=>controller.selectAmazon(i),
+            child: container,
+          ),
+        );
+      }else{
+        child = container;
+      }
+      
+      amazons.add(AnimatedPositioned(
+        duration: Duration(seconds: 2),
+        top: amazon.position.y * cubeSide,
+        left: amazon.position.x * cubeSide,
+        child: child
       ));
     }
     return amazons;
   }
 
+
+
+
+  //METHODS FOR PRINTING THE BOARD
+  ////////////////////////////////
+   
+  
   List<Row> getRows(double cubeSide){
     List<Row> rows = [];
     for(int i = 0; i < 10; i++){
