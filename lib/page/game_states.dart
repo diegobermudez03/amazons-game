@@ -18,8 +18,8 @@ class GameInitialState extends GameState{
 
 //state for when a new turn started, it shows the 
 class PossibleAmazonsPlayState extends GameState{
-  final List<int> available;
-  PossibleAmazonsPlayState(super.amazons, super.barriers, this.available);
+  final List<int> availableAmazons;
+  PossibleAmazonsPlayState(super.amazons, super.barriers, this.availableAmazons);
 }
 
 
@@ -41,6 +41,19 @@ class PossibleThrowsState extends GameState{
   final List<Position> available;
   final int selectedAmazon;
   PossibleThrowsState(super.amazons, super.barriers, this.available, this.selectedAmazon);
+}
+
+//class for when a barrier was just added, this is for being able to create the animation in the frontend
+class JustThrowedState extends GameState{
+  final Position thrownFrom;
+  final Position thrownTo;
+  JustThrowedState(super.amazons, super.barriers, this.thrownFrom, this.thrownTo);
+}
+
+//state for when someone won the game
+class GameOver extends GameState{
+  final int winner;
+  GameOver(super.amazons, super.barriers, this.winner);
 }
 
 //models

@@ -11,11 +11,31 @@ class GameController extends Cubit<GameState>{
     showPossiblePlays();
   }
 
+  //method for when the game is reseted
+  void resetGame(){
+    emit(GameInitialState());
+    playerMove = 0;
+    showPossiblePlays();
+  }
+
+  //method for when a position is selected to throw a barrier
+  void throwBarrier(Position pos)async{
+    final amazonIndex = (state as PossibleThrowsState).selectedAmazon;
+    final initialPos = state.amazons[amazonIndex].position;
+    emit(JustThrowedState(state.amazons, state.barriers, initialPos, pos));
+    //allow the frontend to reproduce the animation
+    await Future.delayed(Duration(seconds: 1));
+    state.barriers.add(pos);
+    //change player turn
+    playerMove = playerMove == 1 ? 2 : 1;
+    //here we move to the next player turn
+    showPossiblePlays();
+  }
 
   //method to move the amazon to the selected position
   void moveAmazon(Position position) async{
-    state.amazons[playerMove - 1].position = position;
     final selectedAmazon = (state as PossibleAmazonMovesState).selectedAmazon;
+    state.amazons[selectedAmazon].position = position;
     emit(PositionedAmazonsState(state.amazons, state.barriers));
     //wait for animation to show the movement
     await Future.delayed(Duration(seconds: 1));
@@ -25,14 +45,20 @@ class GameController extends Cubit<GameState>{
   
   //method when a new turn is started, it shows the available amazons to select and move
   void showPossiblePlays(){
-    final List<int> possibleMoves = [];
+    final List<int> possibleAmazons = [];
     for(int i = 0; i < state.amazons.length; i++){
       final amazon = state.amazons[i];
       if(amazon.player == playerMove && _ableToMove(i)){
-        possibleMoves.add(i);
+        possibleAmazons.add(i);
       }
     }
-    emit(PossibleAmazonsPlayState(state.amazons, state.barriers, possibleMoves));
+    //if no possible amazons to move, then the game is over, we declare the winner as the opponent
+    if(possibleAmazons.isEmpty){
+      int winner = playerMove == 1 ? 2 : 1;
+      emit(GameOver(state.amazons, state.barriers, winner));
+      return;
+    }
+    emit(PossibleAmazonsPlayState(state.amazons, state.barriers, possibleAmazons));
   }
   
   //method for when an amazon to move was selected
@@ -85,7 +111,9 @@ class GameController extends Cubit<GameState>{
     checkPosition(int x, int y){
       if(x < 0 || x > 9 || y < 0 || y > 9) {
         return false;
-      } else if(state.barriers.contains(Position(x, y))) {
+      } else if(state.barriers.contains(Position(x, y))) {  //if the barrier blocks
+        return false;
+      } else if(state.amazons.map((a)=>a.position).toSet().contains(Position(x, y))){ //if other amaozn blocks
         return false;
       }
       return true;
