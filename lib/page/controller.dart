@@ -10,6 +10,18 @@ class GameController extends Cubit<GameState>{
     playerMove = player;
     showPossiblePlays();
   }
+
+
+  //method to move the amazon to the selected position
+  void moveAmazon(Position position) async{
+    state.amazons[playerMove - 1].position = position;
+    final selectedAmazon = (state as PossibleAmazonMovesState).selectedAmazon;
+    emit(PositionedAmazonsState(state.amazons, state.barriers));
+    //wait for animation to show the movement
+    await Future.delayed(Duration(seconds: 1));
+    final possibleThrows = _getAvailablePositions(position, _getOccupiedPositions());
+    emit(PossibleThrowsState(state.amazons, state.barriers, possibleThrows, selectedAmazon));
+  }
   
   //method when a new turn is started, it shows the available amazons to select and move
   void showPossiblePlays(){
@@ -26,51 +38,44 @@ class GameController extends Cubit<GameState>{
   //method for when an amazon to move was selected
   void selectAmazon(int index)async{
     await Future.delayed(Duration(milliseconds: 500));
-    final availableMoves = _getAvailableMovesForAmazon(index);
+    final amazon = state.amazons[index];
+    final availableMoves = _getAvailablePositions(amazon.position, _getOccupiedPositions());
     emit(PossibleAmazonMovesState(state.amazons, state.barriers, availableMoves, index));
   }
 
-  List<Position> _getAvailableMovesForAmazon(int index) {
-    final List<Position> availableMoves = [];
-    final amazon = state.amazons[index];
-    final startPos = amazon.position;
-    final allAmazonPositions = state.amazons.map((a) => a.position).toSet();
+  //to get all the occupied positions by either amazons or barriers
+  Set<Position> _getOccupiedPositions(){
+    final Set<Position> occupied = state.amazons.map((a)=>a.position).toSet();
+    occupied.addAll(state.barriers);
+    return occupied;
+  }
 
+  //function to get available positions based on an starting one, either for amazons or barriers
+  List<Position> _getAvailablePositions(Position position, Set<Position> nonAvailable) {
+    final List<Position> availablePositions = [];
     const List<List<int>> directions = [
-      [0, 1], 
-      [0, -1],
-      [1, 0], 
-      [-1, 0],
-      [1, 1], 
-      [1, -1],
-      [-1, 1],
-      [-1, -1]
+      [0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], 
+      [1, -1], [-1, 1], [-1, -1]
     ];
-
     for (final dir in directions) {
       final dx = dir[0];
       final dy = dir[1];
-
       for (int i = 1; ; i++) {
-        final nextX = startPos.x + i * dx;
-        final nextY = startPos.y + i * dy;
+        final nextX = position.x + i * dx;
+        final nextY = position.y + i * dy;
         final nextPos = Position(nextX, nextY);
         //check Board Boundaries
         if (nextX < 0 || nextX > 9 || nextY < 0 || nextY > 9) {
           break;
         }
         //check for Barriers
-        if (state.barriers.contains(nextPos)) {
+        if (nonAvailable.contains(nextPos)) {
           break; 
         }
-        //check for Other Amazons
-        if (allAmazonPositions.contains(nextPos)) {
-           break; 
-        }
-        availableMoves.add(nextPos);
+        availablePositions.add(nextPos);
       }
     }
-    return availableMoves;
+    return availablePositions;
   }
 
   //internal method to check if a specific amazon is able to move

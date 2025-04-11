@@ -35,8 +35,13 @@ class GamePage extends StatelessWidget{
                   ),
                   ...getAmazonsPositions(state, cubeSide, gameController)
               ];
-              if(state is PossibleAmazonMovesState){
-                stackChildren.addAll( getAvailableMoves(state.available, gameController, cubeSide));
+              if(state is PossibleAmazonMovesState || state is PossibleThrowsState){
+                List<Position> available = switch(state) {
+                  PossibleAmazonMovesState() => state.available,
+                  PossibleThrowsState() => state.available,
+                  _ => []
+                };
+                stackChildren.addAll( getAvailableMoves(available, gameController, cubeSide, state is PossibleThrowsState));
               }
               //when we have the stack completed, then we add it to the overall
               //column display, and dinamically we ask for the player
@@ -81,20 +86,52 @@ class GamePage extends StatelessWidget{
     controller.startPlay(player);
   }   
 
-
-  List<Positioned> getAvailableMoves(List<Position> available, GameController controller, double cubeSide){
+  
+  //for printing the dots of the available positions to moves
+  List<Positioned> getAvailableMoves(List<Position> available, GameController controller, double cubeSide, bool throwing){
     List<Positioned> positions = [];
+    final side = cubeSide/3;
+    Widget child;
+    //depending on if we are throwing or not, then the child will be an x or simply a dot
+    if(throwing){
+      child = Icon(Icons.dangerous_outlined, color: const Color.fromARGB(115, 58, 22, 19), size: cubeSide);
+    }else{
+      child =  Container(
+        width: side,
+        height: side,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: Colors.black
+        ),
+      );
+    }
     for(final pos in available){
+      //depending on if we are throwing or not we define the callbackl
+      void Function() callback;
+      if(throwing){
+        callback = (){};
+      }else{
+        callback = ()=>controller.moveAmazon(pos);
+      }
       positions.add(Positioned(
         //formula is (X * side) + (side/2) to center - (half of the width/height, to have it perfectly centered)
-        top: (pos.y * cubeSide) + (cubeSide / 2) - 15,
-        left: (pos.x * cubeSide) + (cubeSide / 2) - 15,
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: Colors.black
+        top: (pos.y * cubeSide),
+        left: (pos.x * cubeSide),
+        //MATERIAL FOR SHOWING THE WELL
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            splashColor: const Color.fromARGB(137, 244, 67, 54),
+            onTap: callback,
+            //SIZED BOX TO COVER ALL THE SQUARE IN THE TAP AND WELL
+            child: SizedBox(
+              width: cubeSide,
+              height: cubeSide,
+              //THE DOT
+              child: Center(
+                child: child
+              ),
+            ),
           ),
         )
       ));
@@ -112,8 +149,10 @@ class GamePage extends StatelessWidget{
     for(int i = 0; i < state.amazons.length; i++){
       final amazon = state.amazons[i];
 
-      //if we are in the already selected state, then we add the color hardcoded to the container
-      final bool selectedToMove = state is PossibleAmazonMovesState && state.selectedAmazon == i;
+      //if we are in the already selected state or throw state, then we add the color hardcoded to the container
+      bool selectedToMove = state is PossibleAmazonMovesState && state.selectedAmazon == i;
+      selectedToMove = selectedToMove || (state is PossibleThrowsState && state.selectedAmazon == i);
+
       Container container = Container(
           width: cubeSide,
           height: cubeSide,
@@ -141,7 +180,7 @@ class GamePage extends StatelessWidget{
       }
       
       amazons.add(AnimatedPositioned(
-        duration: Duration(seconds: 2),
+        duration: Duration(seconds: 1),
         top: amazon.position.y * cubeSide,
         left: amazon.position.x * cubeSide,
         child: child

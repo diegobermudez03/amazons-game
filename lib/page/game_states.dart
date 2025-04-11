@@ -31,6 +31,17 @@ class PossibleAmazonMovesState extends GameState{
   
 }
 
+//class for normal state with amazons positioned
+class PositionedAmazonsState extends GameState{
+  PositionedAmazonsState(super.amazons, super.barrier);
+}
+
+//class for show available positions to throw barrier
+class PossibleThrowsState extends GameState{
+  final List<Position> available;
+  final int selectedAmazon;
+  PossibleThrowsState(super.amazons, super.barriers, this.available, this.selectedAmazon);
+}
 
 //models
 class Amazon{
