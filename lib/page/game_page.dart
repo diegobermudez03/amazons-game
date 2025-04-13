@@ -140,7 +140,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
           ),
           OptionButton(
             callback: () => selectPlayer(gameController, 2), 
-            text: "Jugador 2 (Futuro bot)"
+            text: "Jugador 2"
           ),
         ],
       ),
@@ -231,7 +231,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
         decoration: BoxDecoration(
           color: selectedToMove ? Colors.red : Colors.transparent,
           image: DecorationImage(
-            image: AssetImage('player${amazon.player}.png'),
+            image: AssetImage(getAsset('player${amazon.player}.png')),
           ),
         ),
       );
