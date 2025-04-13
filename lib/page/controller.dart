@@ -1,4 +1,5 @@
 import 'package:amazons_game/page/game_states.dart';
+import 'package:amazons_game/page/global.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class GameController extends Cubit<GameState>{
@@ -15,7 +16,6 @@ class GameController extends Cubit<GameState>{
   void resetGame(){
     emit(GameInitialState());
     playerMove = 0;
-    showPossiblePlays();
   }
 
   //method for when a position is selected to throw a barrier
@@ -24,7 +24,7 @@ class GameController extends Cubit<GameState>{
     final initialPos = state.amazons[amazonIndex].position;
     emit(JustThrowedState(state.amazons, state.barriers, initialPos, pos));
     //allow the frontend to reproduce the animation
-    await Future.delayed(Duration(seconds: 1));
+    await Future.delayed(animationDuration);
     state.barriers.add(pos);
     //change player turn
     playerMove = playerMove == 1 ? 2 : 1;
@@ -38,7 +38,7 @@ class GameController extends Cubit<GameState>{
     state.amazons[selectedAmazon].position = position;
     emit(PositionedAmazonsState(state.amazons, state.barriers));
     //wait for animation to show the movement
-    await Future.delayed(Duration(seconds: 1));
+    await Future.delayed(animationDuration);
     final possibleThrows = _getAvailablePositions(position, _getOccupiedPositions());
     emit(PossibleThrowsState(state.amazons, state.barriers, possibleThrows, selectedAmazon));
   }

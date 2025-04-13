@@ -1,5 +1,7 @@
 import 'package:amazons_game/page/controller.dart';
 import 'package:amazons_game/page/game_states.dart';
+import 'package:amazons_game/page/global.dart';
+import 'package:amazons_game/page/widgets/option_button.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,7 +21,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
   void initState() {
     throwAnimationController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 1),
+      duration: animationDuration,
     );
     throwAnimation = Tween(begin: 0.0, end: 1.0).animate(throwAnimationController);
     super.initState();
@@ -51,7 +53,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                     content: Text("Jugador ${state.winner} ha ganado!"),
                     actions: [TextButton(onPressed: (){
                       controller.resetGame();
-                      Navigator.of(context).pop();
+                      Navigator.of(ctx).pop();
                     }, 
                     child: Text("Volver a jugar"))],
                   );
@@ -107,8 +109,11 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
               //when we have the stack completed, then we add it to the overall
               //column display, and dinamically we ask for the player
               final List<Widget> columnChildren = [
-                Text("El juego de las amazonas"),
+                const Spacer(),
+                Text("El juego de las amazonas", style: TextStyle(fontSize: 20),),
+                const Spacer(),
                 Stack(children: stackChildren),
+                Spacer(flex: state is GameInitialState ? 1:4,),
               ];
               if (state is GameInitialState) {
                 columnChildren.addAll(getPlayerOptions(gameController));
@@ -125,19 +130,21 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
 
   List<Widget> getPlayerOptions(GameController gameController) {
     return [
-      Text("Quien va a iniciar?"),
+      Text("Quien va a iniciar?", style: TextStyle(fontSize: 20),),
+      const Spacer(),
       Row(
         children: [
-          ElevatedButton(
-            onPressed: () => selectPlayer(gameController, 1),
-            child: Text("Jugador 1"),
+          OptionButton(
+            callback: () => selectPlayer(gameController, 1), 
+            text: "Jugador 1"
           ),
-          ElevatedButton(
-            onPressed: () => selectPlayer(gameController, 2),
-            child: Text("Jugador 2 (Futuro bot)"),
-          )
+          OptionButton(
+            callback: () => selectPlayer(gameController, 2), 
+            text: "Jugador 2 (Futuro bot)"
+          ),
         ],
-      )
+      ),
+      const Spacer(flex: 5,),
     ];
   }
 
@@ -245,7 +252,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       }
 
       amazons.add(AnimatedPositioned(
-          duration: Duration(seconds: 1),
+          duration: animationDuration,
           top: amazon.position.y * cubeSide,
           left: amazon.position.x * cubeSide,
           child: child));
@@ -265,8 +272,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
 
   Row getRow(double cubeSide, bool isEven) {
     List<Widget> row = [];
-    final color1 = const Color.fromARGB(255, 255, 233, 194);
-    final color2 = const Color.fromARGB(255, 172, 139, 83);
+    final color1 = const Color.fromARGB(255, 252, 249, 244);
+    final color2 = const Color.fromARGB(255, 228, 205, 167);
     for (int i = 0; i < 10; i++) {
       Color color;
       //if is even then we check a possibility, if not the inverse
