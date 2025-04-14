@@ -124,6 +124,10 @@ class GameController extends Cubit<GameState>{
     ableToMove = ableToMove || checkPosition(amazon.position.x - 1, amazon.position.y);
     ableToMove = ableToMove || checkPosition(amazon.position.x, amazon.position.y + 1);
     ableToMove = ableToMove || checkPosition(amazon.position.x, amazon.position.y - 1);
+    ableToMove = ableToMove || checkPosition(amazon.position.x + 1, amazon.position.y + 1);
+    ableToMove = ableToMove || checkPosition(amazon.position.x - 1, amazon.position.y - 1);
+    ableToMove = ableToMove || checkPosition(amazon.position.x + 1, amazon.position.y - 1);
+    ableToMove = ableToMove || checkPosition(amazon.position.x - 1, amazon.position.y + 1);
     return ableToMove;
   }
 
