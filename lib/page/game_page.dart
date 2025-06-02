@@ -80,6 +80,10 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
               ];
               //if we are in the just thrown barrir, we forward the animation
               if (state is JustThrowedState) {
+                print(state.thrownFrom.x);
+                print(state.thrownFrom.y);
+                print(state.thrownTo.x);
+                print(state.thrownTo.y);
                 throwAnimationController.forward();
                 stackChildren.add(AnimatedBuilder(
                     animation: throwAnimationController,

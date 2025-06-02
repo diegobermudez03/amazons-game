@@ -1,12 +1,11 @@
-FROM cirrusci/flutter:latest AS builder
-WORKDIR /app
-COPY . .
-
-RUN flutter pub get
-RUN flutter build web
-
+# Use an official Nginx image to serve static files
 FROM nginx:alpine
 
-COPY --from=builder /app/build/web /usr/share/nginx/html
+# Copy the built Flutter web app to the Nginx html directory
+COPY build/web /usr/share/nginx/html
+
+# Expose port 80 for the web server
 EXPOSE 80
+
+# Start Nginx when the container launches
 CMD ["nginx", "-g", "daemon off;"]

@@ -2,14 +2,25 @@ import 'package:amazons_game/page/game_states.dart';
 import 'package:amazons_game/page/global.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+// Helper class for the bot's decision making
+class BotMove {
+  final int amazonIndex;
+  final Position amazonMovePos;
+  final Position arrowShotPos;
+  double score;
+
+  BotMove(this.amazonIndex, this.amazonMovePos, this.arrowShotPos, {this.score = 0.0});
+}
 class GameController extends Cubit<GameState>{
 
   int playerMove = 0;
+  int bot = 0;
   GameController(): super(GameInitialState());
 
   void startPlay(int player){
-    playerMove = player;
-    showPossiblePlays();
+    bot = player == 1 ? 2 : 1;
+    playerMove = 1;
+    _nextPlay();
   }
 
   //method for when the game is reseted
@@ -29,7 +40,7 @@ class GameController extends Cubit<GameState>{
     //change player turn
     playerMove = playerMove == 1 ? 2 : 1;
     //here we move to the next player turn
-    showPossiblePlays();
+    _nextPlay();
   }
 
   //method to move the amazon to the selected position
@@ -106,31 +117,153 @@ class GameController extends Cubit<GameState>{
 
   //internal method to check if a specific amazon is able to move
   bool _ableToMove(int index){
+    // Corrected: An amazon is able to move if _getAvailablePositions returns any valid moves.
+    // _getOccupiedPositions() correctly provides all amazons and barriers as obstacles.
     final amazon = state.amazons[index];
-    //inner function to check if the amazon can move
-    checkPosition(int x, int y){
-      if(x < 0 || x > 9 || y < 0 || y > 9) {
-        return false;
-      } else if(state.barriers.contains(Position(x, y))) {  //if the barrier blocks
-        return false;
-      } else if(state.amazons.map((a)=>a.position).toSet().contains(Position(x, y))){ //if other amaozn blocks
-        return false;
-      }
-      return true;
+    return _getAvailablePositions(amazon.position, _getOccupiedPositions()).isNotEmpty;
+  }
+
+  // Helper for deep copying amazons
+  List<Amazon> _cloneAmazons(List<Amazon> amazons) {
+    return amazons.map((a) => Amazon(a.player, Position(a.position.x, a.position.y))).toList();
+  }
+
+  // Helper for deep copying barriers
+  Set<Position> _cloneBarriers(Set<Position> barriers) {
+    return barriers.map((p) => Position(p.x, p.y)).toSet();
+  }
+
+  /*
+    METHOD FOR EVALUATING THE SCORE OF A GIVEN STATE
+  */
+  double _evaluateBoardState(List<Amazon> amazons, Set<Position> barriers) {
+    double botPlayerMobility = 0;
+    double opponentPlayerMobility = 0;
+
+    final Set<Position> occupiedPositions = _cloneBarriers(barriers);
+    for (final amazon in amazons) {
+      occupiedPositions.add(amazon.position);
     }
+
+    //iterate over all amazons, and get the possible moves of each one, then sum with the corresponding player
+    for (int i = 0; i < amazons.length; i++) {
+      final amazon = amazons[i];
+      // Pass the cloned occupiedPositions which includes all pieces for accurate mobility check
+      final List<Position> moves = _getAvailablePositions(amazon.position, occupiedPositions);
+      if (amazon.player == bot) {
+        botPlayerMobility += moves.length;
+      } else {
+        opponentPlayerMobility += moves.length;
+      }
+    }
+
+    //heuristic is BOT MOVEMENTS - PLAYER MOVEMENTS. the more movements the bot has and the less the player has, the best
+    return botPlayerMobility - opponentPlayerMobility;
+  }
+
+
+  /*
+    ALGORITHM METHOD
+  */
+  Future<BotMove?> _findBestBotMove() async {
+    BotMove? bestMoveFound;
+    //define the initial scroe value
+    double maxScore = double.negativeInfinity;
     
-    bool ableToMove = false;
-    ableToMove = ableToMove || checkPosition(amazon.position.x + 1, amazon.position.y);
-    ableToMove = ableToMove || checkPosition(amazon.position.x - 1, amazon.position.y);
-    ableToMove = ableToMove || checkPosition(amazon.position.x, amazon.position.y + 1);
-    ableToMove = ableToMove || checkPosition(amazon.position.x, amazon.position.y - 1);
-    ableToMove = ableToMove || checkPosition(amazon.position.x + 1, amazon.position.y + 1);
-    ableToMove = ableToMove || checkPosition(amazon.position.x - 1, amazon.position.y - 1);
-    ableToMove = ableToMove || checkPosition(amazon.position.x + 1, amazon.position.y - 1);
-    ableToMove = ableToMove || checkPosition(amazon.position.x - 1, amazon.position.y + 1);
-    return ableToMove;
+
+    //extract the amazons of the bot
+    final List<int> botAmazonIndices = [];
+    for (int i = 0; i < state.amazons.length; i++) {
+      if (state.amazons[i].player == bot) {
+        botAmazonIndices.add(i);
+      }
+    }
+
+    if (botAmazonIndices.isEmpty) return null;
+
+    //HERE WE ITERATE OVER all possible amazons and simulate their shots
+    for (final amazonIdx in botAmazonIndices) {
+      final currentAmazon = state.amazons[amazonIdx];
+      final occupiedForAmazonMove = _getOccupiedPositions(); 
+      //we obtain all possible moves for the current amazon
+      final List<Position> possibleMovesForAmazon = _getAvailablePositions(currentAmazon.position, occupiedForAmazonMove);
+      //here we iterate over all possible moves of the given amazon
+
+      for (final newAmazonPos in possibleMovesForAmazon) {
+        List<Amazon> amazonsAfterMove = _cloneAmazons(state.amazons);
+        amazonsAfterMove[amazonIdx].position = Position(newAmazonPos.x, newAmazonPos.y);
+        Set<Position> barriersForShotSim = _cloneBarriers(state.barriers);
+        // Calculate occupied positions for the arrow shot
+        final Set<Position> occupiedForShot = _cloneBarriers(barriersForShotSim);
+        for (final amz in amazonsAfterMove) {
+          occupiedForShot.add(amz.position); // Includes the moved amazon at its new spot
+        }
+        //we get the available shot positions from the amazons simulated position
+        final List<Position> possibleShots = _getAvailablePositions(newAmazonPos, occupiedForShot);
+        // An arrow shot is mandatory. If no shots are possible from newAmazonPos, this move is invalid.
+        if (possibleShots.isEmpty) continue; 
+        //we evaluate all possible shots if moved the amazon on this position
+        
+        for (final shotPos in possibleShots) {
+          // Simulate the shot by creating the board state *after* this shot
+          Set<Position> barriersAfterShot = _cloneBarriers(barriersForShotSim);
+          barriersAfterShot.add(Position(shotPos.x, shotPos.y));
+          //get the score if this exact move (amazon, position, and thrown) is done
+          double currentScore = _evaluateBoardState(amazonsAfterMove, barriersAfterShot);
+          //update if this has best score than the already had
+          if (currentScore > maxScore) {
+            maxScore = currentScore;
+            bestMoveFound = BotMove(amazonIdx, newAmazonPos, shotPos, score: currentScore);
+          }
+        }
+      }
+    }
+    return bestMoveFound;
+  }
+
+
+  void _nextPlay() async {
+    //if the next play is not the bots one, then we continue with the normal player flow
+    if(playerMove != bot){
+      showPossiblePlays();
+      return;
+    }
+    //we emit this state only to reset animations
+    emit(PossibleAmazonsPlayState(_cloneAmazons(state.amazons), _cloneBarriers(state.barriers), []));
+    await Future.delayed(animationDuration); 
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //THIS IS WHERE WE CALL THE FIND BEST BOT MOVE, HERE WE DECIDE WHAT TO MOVE (ALGORITHM)
+    final BotMove? bestBotMove = await _findBestBotMove();
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    //if no bot move was returned, means the bot lost
+    if (bestBotMove == null) {
+      int winner = playerMove == 1 ? 2 : 1; // Opponent wins
+      emit(GameOver(_cloneAmazons(state.amazons), _cloneBarriers(state.barriers), winner));
+      return;
+    }
+
+    //extract bot moves attributes
+    final selectedAmazonIndex = bestBotMove.amazonIndex;
+    final amazonTargetPos = bestBotMove.amazonMovePos;
+    final shotTargetPos = bestBotMove.arrowShotPos;
+
+    //we move the amazon and emit the new state with the amazon moved
+    state.amazons[selectedAmazonIndex].position = Position(amazonTargetPos.x, amazonTargetPos.y);
+    emit(PositionedAmazonsState(_cloneAmazons(state.amazons), _cloneBarriers(state.barriers)));
+    await Future.delayed(animationDuration);
+   
+    //just to simulate thinking of what to throw, and after that we emit the state and add the barrier to the state
+    emit(PossibleThrowsState(_cloneAmazons(state.amazons), _cloneBarriers(state.barriers), [], selectedAmazonIndex));
+    await Future.delayed(Duration(seconds: 1)); 
+    emit(JustThrowedState(_cloneAmazons(state.amazons), _cloneBarriers(state.barriers), Position(amazonTargetPos.x, amazonTargetPos.y), Position(shotTargetPos.x, shotTargetPos.y)));
+    await Future.delayed(Duration(seconds: 1)); 
+    state.barriers.add(Position(shotTargetPos.x, shotTargetPos.y)); 
+
+    // Change player turn
+    playerMove = playerMove == 1 ? 2 : 1;
+    _nextPlay(); 
   }
 
 }
-
-
